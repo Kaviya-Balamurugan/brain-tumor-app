@@ -6,8 +6,9 @@ from PIL import Image
 import gdown
 import os
 
+
 # ================= DOWNLOAD MODEL =================
-url = "https://drive.google.com/uc?id=1dmJBPyZkBUGFaTaIJ8qRhv1_-g98tSS7"
+url = "https://drive.google.com/uc?id=1fbTb-NEivEEY4-OzmNx5HQYokG6CRd3L"
 output = "brain_tumor_detector.keras"
 
 if not os.path.exists(output):
