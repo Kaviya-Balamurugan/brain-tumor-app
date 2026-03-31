@@ -5,9 +5,12 @@ from PIL import Image
 import gdown
 import os
 import onnxruntime as ort
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
+from datetime import datetime
 
 # ================= PAGE CONFIG =================
-st.set_page_config(page_title="Brain Tumor Classification", layout="wide")
+st.set_page_config(page_title="Brain Tumor Detection", layout="wide")
 
 # ================= DOWNLOAD MODEL =================
 url = "https://drive.google.com/uc?id=1fbTb-NEivEEY4-OzmNx5HQYokG6CRd3L"
@@ -37,7 +40,7 @@ def preprocess_image(image):
 
     image = cv2.resize(image, (IMAGE_SIZE, IMAGE_SIZE))
     image = image.astype(np.float32)
-    image = (image / 127.5) - 1.0  # MobileNetV2 normalization
+    image = (image / 127.5) - 1.0
     image = np.expand_dims(image, axis=0)
 
     return image
@@ -52,8 +55,28 @@ def predict(image):
     predictions = outputs[0][0]
     return predictions
 
+# ================= PDF REPORT =================
+def generate_pdf(prediction, confidence):
+    file_path = "report.pdf"
+
+    doc = SimpleDocTemplate(file_path)
+    styles = getSampleStyleSheet()
+
+    content = []
+
+    content.append(Paragraph("Brain Tumor Detection Report", styles['Title']))
+    content.append(Spacer(1, 20))
+
+    content.append(Paragraph(f"Prediction: {prediction}", styles['Normal']))
+    content.append(Paragraph(f"Confidence: {confidence*100:.2f}%", styles['Normal']))
+    content.append(Paragraph(f"Date: {datetime.now()}", styles['Normal']))
+
+    doc.build(content)
+
+    return file_path
+
 # ================= UI =================
-st.title("🧠 Brain Tumor Detection System")
+st.title("🧠 Brain Tumor Classification System")
 st.write("Upload an MRI image to classify tumor type using AI.")
 
 uploaded_file = st.file_uploader("Upload MRI Image", type=["jpg", "png", "jpeg"])
@@ -61,8 +84,11 @@ uploaded_file = st.file_uploader("Upload MRI Image", type=["jpg", "png", "jpeg"]
 if uploaded_file:
     image = Image.open(uploaded_file)
 
-    # Show image
+    # Display image
     st.image(image, caption="Uploaded MRI", use_container_width=True)
+
+    st.markdown("---")
+    st.subheader("🧪 Analysis Result")
 
     # Prediction
     predictions = predict(image)
@@ -73,7 +99,17 @@ if uploaded_file:
     st.success(f"🧠 Prediction: {CLASS_NAMES[class_idx]}")
     st.info(f"📊 Confidence: {confidence*100:.2f}%")
 
-    # ================= TOP 2 PREDICTIONS =================
+    # ================= SMART DIAGNOSIS =================
+    if CLASS_NAMES[class_idx] == "no_tumor":
+        st.success("✅ No tumor detected")
+    else:
+        st.error("⚠️ Tumor detected")
+
+    # ================= CONFIDENCE WARNING =================
+    if confidence < 0.6:
+        st.warning("⚠️ Low confidence prediction. Please consult a medical expert.")
+
+    # ================= TOP 2 =================
     st.subheader("🔍 Top Predictions")
 
     top_indices = predictions.argsort()[-2:][::-1]
@@ -88,9 +124,21 @@ if uploaded_file:
         st.progress(float(prob))
         st.write(f"{CLASS_NAMES[i]}: {prob*100:.2f}%")
 
-    # ================= PROFESSIONAL NOTE =================
-    st.warning(
-        "⚠️ Grad-CAM visualization is not included in this deployed version "
-        "because ONNX runtime does not support gradient-based explainability. "
-        "However, it is implemented in the TensorFlow research version."
-    )
+    # ================= PDF DOWNLOAD =================
+    pdf = generate_pdf(CLASS_NAMES[class_idx], confidence)
+
+    with open(pdf, "rb") as f:
+        st.download_button("📄 Download Report", f, file_name="report.pdf")
+
+    # ================= MODEL INFO =================
+    with st.expander("ℹ️ Model Information"):
+        st.write("""
+        - Model: MobileNetV2
+        - Framework: ONNX Runtime
+        - Input Size: 224x224
+        - Classes: 4
+        - Accuracy: ~91%
+        """)
+
+# ================= DISCLAIMER =================
+st.caption("⚠️ This tool is for educational purposes only and not for medical diagnosis.")
