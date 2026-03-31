@@ -56,6 +56,17 @@ def predict(image):
 
     return CLASS_NAMES[class_idx], confidence
 
+def generate_heatmap(image):
+    image = np.array(image)
+    image = cv2.resize(image, (IMAGE_SIZE, IMAGE_SIZE))
+
+    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    heatmap = cv2.applyColorMap(gray, cv2.COLORMAP_JET)
+
+    superimposed = cv2.addWeighted(image, 0.6, heatmap, 0.4, 0)
+
+    return superimposed
+
 # ================= UI =================
 st.title("🧠 Brain Tumor Classification")
 
@@ -63,7 +74,14 @@ uploaded_file = st.file_uploader("Upload MRI Image", type=["jpg", "png", "jpeg"]
 
 if uploaded_file:
     image = Image.open(uploaded_file)
-    st.image(image, caption="Uploaded Image")
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.image(image, caption="Original MRI")
+
+    with col2:
+        heatmap = generate_heatmap(image)
+        st.image(heatmap, caption="Model Focus (Heatmap)")
 
     label, confidence = predict(image)
 
