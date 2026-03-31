@@ -1,5 +1,4 @@
 import streamlit as st
-import tensorflow as tf
 import numpy as np
 import cv2
 from PIL import Image
@@ -7,10 +6,9 @@ import gdown
 import os
 import onnxruntime as ort
 
-
 # ================= DOWNLOAD MODEL =================
-url = "https://drive.google.com/uc?id=1fbTb-NEivEEY4-OzmNx5HQYokG6CRd3L"
-output = "brain_tumor_detector.keras"
+url = "https://drive.google.com/uc?id=1fbTb-NEivEEY4-OzmNx5HQYokG6CRd3L" 
+output = "model.onnx"
 
 if not os.path.exists(output):
     with st.spinner("Downloading model... please wait ⏳"):
@@ -21,7 +19,6 @@ IMAGE_SIZE = 224
 CLASS_NAMES = ['glioma_tumor', 'meningioma_tumor', 'no_tumor', 'pituitary_tumor']
 
 # ================= LOAD MODEL =================
-
 @st.cache_resource
 def load_model():
     return ort.InferenceSession(output)
@@ -32,12 +29,15 @@ model = load_model()
 def preprocess_image(image):
     image = np.array(image)
 
-    # Fix grayscale images
     if len(image.shape) == 2:
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
 
     image = cv2.resize(image, (IMAGE_SIZE, IMAGE_SIZE))
-    image = tf.keras.applications.mobilenet_v2.preprocess_input(image)
+
+    # Replace TensorFlow preprocessing
+    image = image.astype(np.float32)
+    image = (image / 127.5) - 1.0   # MobileNetV2 normalization
+
     image = np.expand_dims(image, axis=0)
 
     return image
