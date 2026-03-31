@@ -48,17 +48,13 @@ def preprocess_image(image):
 # ================= PREDICTION =================
 def predict(image):
     processed = preprocess_image(image)
-
     inputs = {model.get_inputs()[0].name: processed}
     outputs = model.run(None, inputs)
-
-    predictions = outputs[0][0]
-    return predictions
+    return outputs[0][0]
 
 # ================= PDF REPORT =================
 def generate_pdf(prediction, confidence):
     file_path = "report.pdf"
-
     doc = SimpleDocTemplate(file_path)
     styles = getSampleStyleSheet()
 
@@ -72,42 +68,65 @@ def generate_pdf(prediction, confidence):
     content.append(Paragraph(f"Date: {datetime.now()}", styles['Normal']))
 
     doc.build(content)
-
     return file_path
 
 # ================= UI =================
-st.title("🧠 Brain Tumor Classification System")
-st.write("Upload an MRI image to classify tumor type using AI.")
+st.title("🧠 Brain Tumor Detection System")
+
+st.markdown("""
+### 🔬 AI-powered MRI Analysis Tool  
+Detects brain tumor types using deep learning (MobileNetV2 + ONNX)
+
+- Glioma  
+- Meningioma  
+- Pituitary Tumor  
+- No Tumor  
+""")
 
 uploaded_file = st.file_uploader("Upload MRI Image", type=["jpg", "png", "jpeg"])
 
 if uploaded_file:
     image = Image.open(uploaded_file)
 
-    # Display image
-    st.image(image, caption="Uploaded MRI", use_container_width=True)
+    col1, col2 = st.columns(2)
 
-    st.markdown("---")
-    st.subheader("🧪 Analysis Result")
+    with col1:
+        st.image(image, caption="🖼️ Uploaded MRI", use_container_width=True)
 
     # Prediction
     predictions = predict(image)
-
     class_idx = np.argmax(predictions)
     confidence = predictions[class_idx]
+    label = CLASS_NAMES[class_idx]
 
-    st.success(f"🧠 Prediction: {CLASS_NAMES[class_idx]}")
-    st.info(f"📊 Confidence: {confidence*100:.2f}%")
+    with col2:
+        st.subheader("🧪 Analysis Result")
 
-    # ================= SMART DIAGNOSIS =================
-    if CLASS_NAMES[class_idx] == "no_tumor":
-        st.success("✅ No tumor detected")
-    else:
-        st.error("⚠️ Tumor detected")
+        # SMART RESULT
+        if label == "no_tumor":
+            st.success("✅ No Tumor Detected")
+        else:
+            st.error(f"⚠️ Tumor Detected: {label.replace('_',' ').title()}")
 
-    # ================= CONFIDENCE WARNING =================
-    if confidence < 0.6:
-        st.warning("⚠️ Low confidence prediction. Please consult a medical expert.")
+        st.info(f"📊 Confidence: {confidence*100:.2f}%")
+
+        # INTERPRETATION
+        st.subheader("🩺 Interpretation")
+
+        if confidence > 0.85:
+            st.write("High confidence prediction. Likely accurate.")
+        elif confidence > 0.6:
+            st.write("Moderate confidence. Further medical review recommended.")
+        else:
+            st.warning("Low confidence. Please consult a specialist.")
+
+    # ================= DISTRIBUTION =================
+    st.markdown("---")
+    st.subheader("📊 Confidence Distribution")
+
+    for i, prob in enumerate(predictions):
+        st.progress(float(prob))
+        st.write(f"{CLASS_NAMES[i]}: {prob*100:.2f}%")
 
     # ================= TOP 2 =================
     st.subheader("🔍 Top Predictions")
@@ -117,15 +136,8 @@ if uploaded_file:
     for i in top_indices:
         st.write(f"👉 {CLASS_NAMES[i]}: {predictions[i]*100:.2f}%")
 
-    # ================= CONFIDENCE DISTRIBUTION =================
-    st.subheader("📊 Confidence Distribution")
-
-    for i, prob in enumerate(predictions):
-        st.progress(float(prob))
-        st.write(f"{CLASS_NAMES[i]}: {prob*100:.2f}%")
-
     # ================= PDF DOWNLOAD =================
-    pdf = generate_pdf(CLASS_NAMES[class_idx], confidence)
+    pdf = generate_pdf(label, confidence)
 
     with open(pdf, "rb") as f:
         st.download_button("📄 Download Report", f, file_name="report.pdf")
@@ -140,5 +152,20 @@ if uploaded_file:
         - Accuracy: ~91%
         """)
 
-# ================= DISCLAIMER =================
+    # ================= ABOUT =================
+    with st.expander("📘 About this Project"):
+        st.write("""
+        This project uses deep learning to classify brain tumors from MRI scans.
+        The model was trained using TensorFlow and deployed using ONNX Runtime
+        for efficient and scalable inference.
+
+        Technologies:
+        - TensorFlow (training)
+        - ONNX Runtime (deployment)
+        - Streamlit (UI)
+        """)
+
+# ================= FOOTER =================
+st.markdown("---")
+st.caption("👩‍💻 Developed by Kaviya")
 st.caption("⚠️ This tool is for educational purposes only and not for medical diagnosis.")
