@@ -52,54 +52,21 @@ def predict(image):
     predictions = outputs[0][0]
     return predictions
 
-# ================= HEATMAP =================
-def generate_heatmap(image):
-    image = np.array(image)
-    image = cv2.resize(image, (IMAGE_SIZE, IMAGE_SIZE))
-
-    # Convert to grayscale
-    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
-
-    # Detect edges (important structures)
-    edges = cv2.Canny(gray, 50, 150)
-
-    # Enhance regions (simulate attention)
-    edges = cv2.GaussianBlur(edges, (21, 21), 0)
-
-    # Normalize
-    edges = cv2.normalize(edges, None, 0, 255, cv2.NORM_MINMAX)
-
-    # Apply colormap
-    heatmap = cv2.applyColorMap(edges.astype(np.uint8), cv2.COLORMAP_JET)
-
-    # Blend
-    superimposed = cv2.addWeighted(image, 0.7, heatmap, 0.6, 0)
-
-    return superimposed
-
 # ================= UI =================
 st.title("🧠 Brain Tumor Detection System")
-st.write("Upload an MRI image to detect tumor type with confidence.")
+st.write("Upload an MRI image to classify tumor type using AI.")
 
 uploaded_file = st.file_uploader("Upload MRI Image", type=["jpg", "png", "jpeg"])
 
 if uploaded_file:
     image = Image.open(uploaded_file)
 
-    # Display images
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.image(image, caption="Original MRI", use_container_width=True)
-
-    with col2:
-        heatmap = generate_heatmap(image)
-        st.image(heatmap, caption="Model Focus (Heatmap)", use_container_width=True)
+    # Show image
+    st.image(image, caption="Uploaded MRI", use_container_width=True)
 
     # Prediction
     predictions = predict(image)
 
-    # Top prediction
     class_idx = np.argmax(predictions)
     confidence = predictions[class_idx]
 
@@ -114,9 +81,16 @@ if uploaded_file:
     for i in top_indices:
         st.write(f"👉 {CLASS_NAMES[i]}: {predictions[i]*100:.2f}%")
 
-    # ================= CONFIDENCE BARS =================
-    st.subheader("📊 Prediction Confidence Distribution")
+    # ================= CONFIDENCE DISTRIBUTION =================
+    st.subheader("📊 Confidence Distribution")
 
     for i, prob in enumerate(predictions):
         st.progress(float(prob))
         st.write(f"{CLASS_NAMES[i]}: {prob*100:.2f}%")
+
+    # ================= PROFESSIONAL NOTE =================
+    st.warning(
+        "⚠️ Grad-CAM visualization is not included in this deployed version "
+        "because ONNX runtime does not support gradient-based explainability. "
+        "However, it is implemented in the TensorFlow research version."
+    )
