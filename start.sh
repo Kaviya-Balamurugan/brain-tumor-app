@@ -1,1 +1,1 @@
-uvicorn api:app --host 0.0.0.0 --port 10000
+python -m uvicorn api:app --host 0.0.0.0 --port 10000
