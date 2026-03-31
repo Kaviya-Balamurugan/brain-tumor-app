@@ -57,11 +57,23 @@ def generate_heatmap(image):
     image = np.array(image)
     image = cv2.resize(image, (IMAGE_SIZE, IMAGE_SIZE))
 
+    # Convert to grayscale
     gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
-    heatmap = cv2.applyColorMap(gray, cv2.COLORMAP_JET)
-    heatmap = cv2.GaussianBlur(heatmap, (15, 15), 0)
 
-    superimposed = cv2.addWeighted(image, 0.7, heatmap, 0.5, 0)
+    # Detect edges (important structures)
+    edges = cv2.Canny(gray, 50, 150)
+
+    # Enhance regions (simulate attention)
+    edges = cv2.GaussianBlur(edges, (21, 21), 0)
+
+    # Normalize
+    edges = cv2.normalize(edges, None, 0, 255, cv2.NORM_MINMAX)
+
+    # Apply colormap
+    heatmap = cv2.applyColorMap(edges.astype(np.uint8), cv2.COLORMAP_JET)
+
+    # Blend
+    superimposed = cv2.addWeighted(image, 0.7, heatmap, 0.6, 0)
 
     return superimposed
 
