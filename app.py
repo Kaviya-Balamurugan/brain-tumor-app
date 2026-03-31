@@ -60,10 +60,15 @@ def generate_heatmap(image):
     image = np.array(image)
     image = cv2.resize(image, (IMAGE_SIZE, IMAGE_SIZE))
 
+    # Create intensity map
     gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
     heatmap = cv2.applyColorMap(gray, cv2.COLORMAP_JET)
 
-    superimposed = cv2.addWeighted(image, 0.6, heatmap, 0.4, 0)
+    # Improve visibility
+    heatmap = cv2.GaussianBlur(heatmap, (15, 15), 0)
+
+    # Overlay properly
+    superimposed = cv2.addWeighted(image, 0.7, heatmap, 0.5, 0)
 
     return superimposed
 
