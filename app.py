@@ -6,8 +6,11 @@ import gdown
 import os
 import onnxruntime as ort
 
+# ================= PAGE CONFIG =================
+st.set_page_config(page_title="Brain Tumor Classification", layout="wide")
+
 # ================= DOWNLOAD MODEL =================
-url = "https://drive.google.com/uc?id=1fbTb-NEivEEY4-OzmNx5HQYokG6CRd3L" 
+url = "https://drive.google.com/uc?id=1fbTb-NEivEEY4-OzmNx5HQYokG6CRd3L"
 output = "model.onnx"
 
 if not os.path.exists(output):
@@ -33,11 +36,8 @@ def preprocess_image(image):
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
 
     image = cv2.resize(image, (IMAGE_SIZE, IMAGE_SIZE))
-
-    # Replace TensorFlow preprocessing
     image = image.astype(np.float32)
-    image = (image / 127.5) - 1.0   # MobileNetV2 normalization
-
+    image = (image / 127.5) - 1.0  # MobileNetV2 normalization
     image = np.expand_dims(image, axis=0)
 
     return image
@@ -50,45 +50,61 @@ def predict(image):
     outputs = model.run(None, inputs)
 
     predictions = outputs[0][0]
+    return predictions
 
-    class_idx = np.argmax(predictions)
-    confidence = float(np.clip(predictions[class_idx], 0, 0.999))
-
-    return CLASS_NAMES[class_idx], confidence
-
+# ================= HEATMAP =================
 def generate_heatmap(image):
     image = np.array(image)
     image = cv2.resize(image, (IMAGE_SIZE, IMAGE_SIZE))
 
-    # Create intensity map
     gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
     heatmap = cv2.applyColorMap(gray, cv2.COLORMAP_JET)
-
-    # Improve visibility
     heatmap = cv2.GaussianBlur(heatmap, (15, 15), 0)
 
-    # Overlay properly
     superimposed = cv2.addWeighted(image, 0.7, heatmap, 0.5, 0)
 
     return superimposed
 
 # ================= UI =================
-st.title("🧠 Brain Tumor Classification")
+st.title("🧠 Brain Tumor Detection System")
+st.write("Upload an MRI image to detect tumor type with confidence.")
 
 uploaded_file = st.file_uploader("Upload MRI Image", type=["jpg", "png", "jpeg"])
 
 if uploaded_file:
     image = Image.open(uploaded_file)
+
+    # Display images
     col1, col2 = st.columns(2)
 
     with col1:
-        st.image(image, caption="Original MRI")
+        st.image(image, caption="Original MRI", use_container_width=True)
 
     with col2:
         heatmap = generate_heatmap(image)
-        st.image(heatmap, caption="Model Focus (Heatmap)")
+        st.image(heatmap, caption="Model Focus (Heatmap)", use_container_width=True)
 
-    label, confidence = predict(image)
+    # Prediction
+    predictions = predict(image)
 
-    st.success(f"Prediction: {label}")
-    st.info(f"Confidence: {confidence*100:.2f}%")
+    # Top prediction
+    class_idx = np.argmax(predictions)
+    confidence = predictions[class_idx]
+
+    st.success(f"🧠 Prediction: {CLASS_NAMES[class_idx]}")
+    st.info(f"📊 Confidence: {confidence*100:.2f}%")
+
+    # ================= TOP 2 PREDICTIONS =================
+    st.subheader("🔍 Top Predictions")
+
+    top_indices = predictions.argsort()[-2:][::-1]
+
+    for i in top_indices:
+        st.write(f"👉 {CLASS_NAMES[i]}: {predictions[i]*100:.2f}%")
+
+    # ================= CONFIDENCE BARS =================
+    st.subheader("📊 Prediction Confidence Distribution")
+
+    for i, prob in enumerate(predictions):
+        st.progress(float(prob))
+        st.write(f"{CLASS_NAMES[i]}: {prob*100:.2f}%")
