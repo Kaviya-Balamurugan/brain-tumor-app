@@ -1,10 +1,11 @@
 import streamlit as st
+import tensorflow as tf
 import numpy as np
 import cv2
 from PIL import Image
-import onnxruntime as ort
 import gdown
 import os
+import onnxruntime as ort
 
 
 # ================= DOWNLOAD MODEL =================
@@ -20,9 +21,10 @@ IMAGE_SIZE = 224
 CLASS_NAMES = ['glioma_tumor', 'meningioma_tumor', 'no_tumor', 'pituitary_tumor']
 
 # ================= LOAD MODEL =================
+
 @st.cache_resource
 def load_model():
-    return tf.keras.models.load_model(output)
+    return ort.InferenceSession(output)
 
 model = load_model()
 
@@ -43,7 +45,11 @@ def preprocess_image(image):
 # ================= PREDICTION =================
 def predict(image):
     processed = preprocess_image(image)
-    predictions = model.predict(processed)[0]
+
+    inputs = {model.get_inputs()[0].name: processed}
+    outputs = model.run(None, inputs)
+
+    predictions = outputs[0][0]
 
     class_idx = np.argmax(predictions)
     confidence = float(np.clip(predictions[class_idx], 0, 0.999))
