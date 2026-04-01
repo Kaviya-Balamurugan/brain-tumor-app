@@ -7,7 +7,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from datetime import datetime
 
 # ================= CONFIG =================
-API_URL = "https://brain-tumor-ajxm.onrender.com"  
+API_URL = "https://brain-tumor-ajxm.onrender.com/predict"  
 
 # ================= PAGE CONFIG =================
 st.set_page_config(page_title="Brain Tumor Classification", layout="wide")
