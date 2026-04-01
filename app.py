@@ -1,81 +1,98 @@
 import streamlit as st
-import numpy as np
-import cv2
+import requests
 from PIL import Image
-import gdown
-import os
-import onnxruntime as ort
+import io
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 from datetime import datetime
 
+# ================= CONFIG =================
+API_URL = "https://brain-tumor-ajxm.onrender.com"  
+
 # ================= PAGE CONFIG =================
 st.set_page_config(page_title="Brain Tumor Classification", layout="wide")
 
-# ================= DOWNLOAD MODEL =================
-url = "https://drive.google.com/uc?id=1fbTb-NEivEEY4-OzmNx5HQYokG6CRd3L"
-output = "model.onnx"
-
-if not os.path.exists(output):
-    with st.spinner("Downloading model... please wait ⏳"):
-        gdown.download(url, output, quiet=False)
-
-# ================= CONFIG =================
-IMAGE_SIZE = 224
-CLASS_NAMES = ['glioma_tumor', 'meningioma_tumor', 'no_tumor', 'pituitary_tumor']
-
-# ================= LOAD MODEL =================
-@st.cache_resource
-def load_model():
-    return ort.InferenceSession(output)
-
-model = load_model()
-
-# ================= PREPROCESS =================
-def preprocess_image(image):
-    image = np.array(image)
-
-    if len(image.shape) == 2:
-        image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
-
-    image = cv2.resize(image, (IMAGE_SIZE, IMAGE_SIZE))
-    image = image.astype(np.float32)
-    image = (image / 127.5) - 1.0
-    image = np.expand_dims(image, axis=0)
-
-    return image
-
-# ================= PREDICTION =================
-def predict(image):
-    processed = preprocess_image(image)
-    inputs = {model.get_inputs()[0].name: processed}
-    outputs = model.run(None, inputs)
-    return outputs[0][0]
-
 # ================= PDF REPORT =================
-def generate_pdf(prediction, confidence):
+def generate_pdf(prediction, confidence, level, patient_name):
+
     file_path = "report.pdf"
     doc = SimpleDocTemplate(file_path)
     styles = getSampleStyleSheet()
 
     content = []
 
-    content.append(Paragraph("Brain Tumor Detection Report", styles['Title']))
+    # TITLE
+    content.append(Paragraph("Brain Tumor Detection and Classification Report", styles['Title']))
     content.append(Spacer(1, 20))
 
-    content.append(Paragraph(f"Prediction: {prediction}", styles['Normal']))
+    # PATIENT INFO
+    content.append(Paragraph(f"Patient Name: {patient_name}", styles['Normal']))
+    content.append(Paragraph(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}", styles['Normal']))
+    content.append(Spacer(1, 20))
+
+    # DIAGNOSIS (SMART)
+    if confidence < 0.6:
+        diagnosis = "Uncertain prediction. Confidence too low for reliable diagnosis."
+    elif prediction == "no_tumor":
+        diagnosis = "No Tumor Detected"
+    else:
+        diagnosis = f"Tumor Detected: {prediction.replace('_',' ').title()}"
+
+    content.append(Paragraph("Diagnosis:", styles['Heading2']))
+    content.append(Paragraph(diagnosis, styles['Normal']))
+    content.append(Spacer(1, 15))
+
+    # CONFIDENCE
+    content.append(Paragraph("Confidence Analysis:", styles['Heading2']))
     content.append(Paragraph(f"Confidence: {confidence*100:.2f}%", styles['Normal']))
-    content.append(Paragraph(f"Date: {datetime.now()}", styles['Normal']))
+    content.append(Paragraph(f"Confidence Level: {level}", styles['Normal']))
+    content.append(Spacer(1, 15))
+
+    # INTERPRETATION
+    content.append(Paragraph("Interpretation:", styles['Heading2']))
+
+    if confidence < 0.6:
+        interpretation = "The model is uncertain. A medical expert should review this case."
+    elif level == "High":
+        interpretation = "High confidence prediction. Likely accurate."
+    elif level == "Medium":
+        interpretation = "Moderate confidence. Further medical evaluation recommended."
+    else:
+        interpretation = "Low confidence. Please consult a specialist."
+
+    content.append(Paragraph(interpretation, styles['Normal']))
+    content.append(Spacer(1, 20))
+
+    # DISCLAIMER
+    content.append(Paragraph("Disclaimer:", styles['Heading2']))
+    content.append(Paragraph(
+        "This report is generated using an AI model and is intended for educational purposes only. "
+        "It should not be used as a substitute for professional medical advice.",
+        styles['Normal']
+    ))
 
     doc.build(content)
     return file_path
+
+# ================= API CALL =================
+def predict_from_api(image):
+    buf = io.BytesIO()
+    image.save(buf, format="JPEG")
+
+    files = {"file": ("image.jpg", buf.getvalue(), "image/jpeg")}
+
+    try:
+        response = requests.post(API_URL, files=files)
+        return response.json()
+    except:
+        return {"error": "API not reachable"}
 
 # ================= UI =================
 st.title("🧠 Brain Tumor Classification System")
 
 st.markdown("""
 ### 🔬 AI-powered MRI Analysis Tool  
-Detects brain tumor types using deep learning (MobileNetV2 + ONNX)
+Detect tumor types using deep learning
 
 - Glioma  
 - Meningioma  
@@ -83,6 +100,10 @@ Detects brain tumor types using deep learning (MobileNetV2 + ONNX)
 - No Tumor  
 """)
 
+# PATIENT INPUT
+patient_name = st.text_input("Enter Patient Name", "Anonymous")
+
+# FILE UPLOAD
 uploaded_file = st.file_uploader("Upload MRI Image", type=["jpg", "png", "jpeg"])
 
 if uploaded_file:
@@ -93,77 +114,61 @@ if uploaded_file:
     with col1:
         st.image(image, caption="🖼️ Uploaded MRI", use_container_width=True)
 
-    # Prediction
-    predictions = predict(image)
-    class_idx = np.argmax(predictions)
-    confidence = predictions[class_idx]
-    label = CLASS_NAMES[class_idx]
-
     with col2:
         st.subheader("🧪 Analysis Result")
 
-        # SMART RESULT
-        if label == "no_tumor":
-            st.success("✅ No Tumor Detected")
+        with st.spinner("Analyzing MRI..."):
+            result = predict_from_api(image)
+
+        # ERROR HANDLING
+        if "error" in result:
+            st.error("❌ API not reachable. Check backend deployment.")
+
+        elif "detail" in result:
+            st.error(f"❌ {result['detail']}")
+
         else:
-            st.error(f"⚠️ Tumor Detected: {label.replace('_',' ').title()}")
+            label = result["prediction"]
+            confidence = result["confidence"]
+            level = result["confidence_level"]
 
-        st.info(f"📊 Confidence: {confidence*100:.2f}%")
+            # SMART RESULT
+            if confidence < 0.6:
+                st.warning("⚠️ Uncertain Prediction")
+            elif label == "no_tumor":
+                st.success("✅ No Tumor Detected")
+            else:
+                st.error(f"⚠️ Tumor Detected: {label.replace('_',' ').title()}")
 
-        # INTERPRETATION
-        st.subheader("🩺 Interpretation")
+            st.info(f"📊 Confidence: {confidence*100:.2f}%")
+            st.write(f"🔍 Confidence Level: **{level}**")
 
-        if confidence > 0.85:
-            st.write("High confidence prediction. Likely accurate.")
-        elif confidence > 0.6:
-            st.write("Moderate confidence. Further medical review recommended.")
-        else:
-            st.warning("Low confidence. Please consult a specialist.")
+            # INTERPRETATION
+            st.subheader("🩺 Interpretation")
 
-    # ================= DISTRIBUTION =================
-    st.markdown("---")
-    st.subheader("📊 Confidence Distribution")
+            if confidence < 0.6:
+                st.warning("The model is uncertain. Please consult a specialist.")
+            elif level == "High":
+                st.write("High confidence prediction. Likely accurate.")
+            elif level == "Medium":
+                st.write("Moderate confidence. Further medical review recommended.")
+            else:
+                st.warning("Low confidence. Please consult a specialist.")
 
-    for i, prob in enumerate(predictions):
-        st.progress(float(prob))
-        st.write(f"{CLASS_NAMES[i]}: {prob*100:.2f}%")
+            # DISTRIBUTION
+            if "all_probabilities" in result:
+                st.markdown("---")
+                st.subheader("📊 Prediction Distribution")
 
-    # ================= TOP 2 =================
-    st.subheader("🔍 Top Predictions")
+                for k, v in result["all_probabilities"].items():
+                    st.progress(float(v))
+                    st.write(f"{k}: {v*100:.2f}%")
 
-    top_indices = predictions.argsort()[-2:][::-1]
+            # PDF DOWNLOAD
+            pdf = generate_pdf(label, confidence, level, patient_name)
 
-    for i in top_indices:
-        st.write(f"👉 {CLASS_NAMES[i]}: {predictions[i]*100:.2f}%")
-
-    # ================= PDF DOWNLOAD =================
-    pdf = generate_pdf(label, confidence)
-
-    with open(pdf, "rb") as f:
-        st.download_button("📄 Download Report", f, file_name="report.pdf")
-
-    # ================= MODEL INFO =================
-    with st.expander("ℹ️ Model Information"):
-        st.write("""
-        - Model: MobileNetV2
-        - Framework: ONNX Runtime
-        - Input Size: 224x224
-        - Classes: 4
-        - Accuracy: ~91%
-        """)
-
-    # ================= ABOUT =================
-    with st.expander("📘 About this Project"):
-        st.write("""
-        This project uses deep learning to classify brain tumors from MRI scans.
-        The model was trained using TensorFlow and deployed using ONNX Runtime
-        for efficient and scalable inference.
-
-        Technologies:
-        - TensorFlow (training)
-        - ONNX Runtime (deployment)
-        - Streamlit (UI)
-        """)
+            with open(pdf, "rb") as f:
+                st.download_button("📄 Download Report", f, file_name="report.pdf")
 
 # ================= FOOTER =================
 st.markdown("---")
