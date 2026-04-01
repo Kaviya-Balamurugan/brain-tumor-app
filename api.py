@@ -29,7 +29,7 @@ CLASS_NAMES = ['glioma_tumor', 'meningioma_tumor', 'no_tumor', 'pituitary_tumor'
 # ================= HEALTH CHECK =================
 @app.get("/")
 def home():
-    return {"message": "Brain Tumor Detection API is running 🚀"}
+    return {"message": "Brain Tumor Classification API is running 🚀"}
 
 # ================= PREPROCESS =================
 def preprocess_image(image):
