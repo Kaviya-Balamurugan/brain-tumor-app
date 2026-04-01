@@ -4,12 +4,22 @@ import cv2
 from PIL import Image
 import onnxruntime as ort
 import io
+import gdown
+import os
 
 app = FastAPI(title="Brain Tumor Detection API")
 
+# ================= DOWNLOAD MODEL =================
+MODEL_PATH = "model.onnx"
+
+if not os.path.exists(MODEL_PATH):
+    print("Downloading model...")
+    url = "https://drive.google.com/uc?id=1fbTb-NEivEEY4-OzmNx5HQYokG6CRd3L"
+    gdown.download(url, MODEL_PATH, quiet=False)
+
 # ================= LOAD MODEL =================
 try:
-    model = ort.InferenceSession("model.onnx")
+    model = ort.InferenceSession(MODEL_PATH)
 except Exception as e:
     raise RuntimeError(f"Model loading failed: {e}")
 
@@ -25,11 +35,9 @@ def home():
 def preprocess_image(image):
     image = np.array(image)
 
-    # Validate image
     if image is None or image.size == 0:
         raise ValueError("Invalid image")
 
-    # Handle grayscale
     if len(image.shape) == 2:
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
 
@@ -52,7 +60,6 @@ async def predict(file: UploadFile = File(...)):
 
         image = Image.open(io.BytesIO(contents)).convert("RGB")
 
-        # Image quality check
         if image.size[0] < 100 or image.size[1] < 100:
             raise HTTPException(status_code=400, detail="Image too small")
 
@@ -66,7 +73,7 @@ async def predict(file: UploadFile = File(...)):
         class_idx = int(np.argmax(predictions))
         confidence = float(predictions[class_idx])
 
-        # Confidence interpretation
+        # Confidence level
         if confidence > 0.85:
             level = "High"
         elif confidence > 0.6:
@@ -83,6 +90,9 @@ async def predict(file: UploadFile = File(...)):
                 for i in range(len(CLASS_NAMES))
             }
         }
+
+    except HTTPException as e:
+        raise e
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
