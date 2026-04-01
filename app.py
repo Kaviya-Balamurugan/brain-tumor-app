@@ -10,7 +10,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from datetime import datetime
 
 # ================= PAGE CONFIG =================
-st.set_page_config(page_title="Brain Tumor Detection", layout="wide")
+st.set_page_config(page_title="Brain Tumor Classification", layout="wide")
 
 # ================= DOWNLOAD MODEL =================
 url = "https://drive.google.com/uc?id=1fbTb-NEivEEY4-OzmNx5HQYokG6CRd3L"
@@ -71,7 +71,7 @@ def generate_pdf(prediction, confidence):
     return file_path
 
 # ================= UI =================
-st.title("🧠 Brain Tumor Detection System")
+st.title("🧠 Brain Tumor Classification System")
 
 st.markdown("""
 ### 🔬 AI-powered MRI Analysis Tool  
