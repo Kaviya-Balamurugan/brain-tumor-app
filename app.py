@@ -3,15 +3,16 @@ import requests
 from PIL import Image
 import io
 import time
+import pandas as pd
 import numpy as np
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 from datetime import datetime
 from database import create_table, insert_report, get_reports
-from datetime import datetime
 
+# ================= INIT =================
 create_table()
-# 🔥 YOUR API LINK
+
 API_URL = "https://brain-tumor-app-1-hmhx.onrender.com/predict"
 
 st.set_page_config(page_title="Brain Tumor Detection", layout="wide")
@@ -31,7 +32,6 @@ def generate_pdf(prediction, confidence, level, patient_name):
     content.append(Paragraph(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}", styles['Normal']))
     content.append(Spacer(1, 20))
 
-    # Diagnosis
     if confidence < 0.6:
         diagnosis = "Uncertain prediction. Confidence too low."
     elif prediction == "no_tumor":
@@ -43,12 +43,10 @@ def generate_pdf(prediction, confidence, level, patient_name):
     content.append(Paragraph(diagnosis, styles['Normal']))
     content.append(Spacer(1, 15))
 
-    # Confidence
     content.append(Paragraph(f"Confidence: {confidence*100:.2f}%", styles['Normal']))
     content.append(Paragraph(f"Confidence Level: {level}", styles['Normal']))
     content.append(Spacer(1, 15))
 
-    # Interpretation
     if confidence < 0.6:
         interpretation = "Low confidence. Prediction is uncertain."
     elif confidence < 0.85:
@@ -62,10 +60,9 @@ def generate_pdf(prediction, confidence, level, patient_name):
     doc.build(content)
     return file_path
 
-# ================= IMAGE QUALITY CHECK =================
+# ================= IMAGE QUALITY =================
 def check_image_quality(image):
     img = np.array(image)
-
     brightness = np.mean(img)
 
     if brightness < 40:
@@ -75,7 +72,7 @@ def check_image_quality(image):
     else:
         return "good"
 
-# ================= API CALL =================
+# ================= API =================
 def predict_from_api(image):
     buf = io.BytesIO()
     image.save(buf, format="JPEG")
@@ -84,14 +81,11 @@ def predict_from_api(image):
 
     try:
         start_time = time.time()
-
         response = requests.post(API_URL, files=files, timeout=60)
-
         end_time = time.time()
-        response_time = round(end_time - start_time, 2)
 
         result = response.json()
-        result["response_time"] = response_time
+        result["response_time"] = round(end_time - start_time, 2)
 
         return result
 
@@ -107,9 +101,7 @@ uploaded_file = st.file_uploader("Upload MRI Image", type=["jpg","png","jpeg"])
 if uploaded_file:
     image = Image.open(uploaded_file)
 
-    # ================= IMAGE QUALITY =================
     quality_status = check_image_quality(image)
-
     if quality_status != "good":
         st.warning(quality_status)
         st.info("Try uploading a clearer MRI image for better accuracy.")
@@ -131,15 +123,15 @@ if uploaded_file:
             confidence = result["confidence"]
             level = result["confidence_level"]
 
-            # Save to database
+            # ✅ SAVE TO DATABASE (fixed indentation)
             insert_report(
-    patient_name,
-    label,
-    confidence,
-    datetime.now().strftime("%Y-%m-%d %H:%M")
-)
+                patient_name,
+                label,
+                confidence,
+                datetime.now().strftime("%Y-%m-%d %H:%M")
+            )
 
-            # ================= SMART RESULT =================
+            # ================= RESULT =================
             if confidence < 0.6:
                 st.warning("⚠️ Uncertain Prediction")
                 st.write("The model is not confident. Please consult a specialist.")
@@ -156,15 +148,12 @@ if uploaded_file:
                 else:
                     st.error(f"🚨 Tumor Detected: {label.replace('_',' ').title()}")
 
-            # ================= CONFIDENCE =================
             st.info(f"📊 Confidence: {confidence*100:.2f}%")
             st.progress(float(confidence))
 
-            # ================= RESPONSE TIME =================
             if "response_time" in result:
                 st.caption(f"⏱️ Prediction Time: {result['response_time']} sec")
 
-            # ================= INTERPRETATION =================
             st.subheader("🩺 Interpretation")
 
             if confidence < 0.6:
@@ -176,14 +165,35 @@ if uploaded_file:
 
             # ================= PDF =================
             pdf = generate_pdf(label, confidence, level, patient_name)
-
             with open(pdf, "rb") as f:
                 st.download_button("📄 Download Report", f, "report.pdf")
 
-            st.markdown("---")
-            st.subheader("📂 Previous Reports")
-            
-            reports = get_reports()
-            
-            for r in reports[:10]:
-                st.write(f"👤 {r[1]} | 🧠 {r[2]} | 📊 {r[3]*100:.2f}% | 🕒 {r[4]}")
+# ================= REPORTS =================
+st.markdown("---")
+st.subheader("📂 Previous Reports")
+
+reports = get_reports()
+
+for r in reports[:10]:
+    st.write(f"👤 {r[1]} | 🧠 {r[2]} | 📊 {r[3]*100:.2f}% | 🕒 {r[4]}")
+
+# ================= ANALYTICS =================
+st.markdown("---")
+st.subheader("📊 Analytics Dashboard")
+
+if reports:
+    df = pd.DataFrame(reports, columns=["id", "name", "prediction", "confidence", "date"])
+
+    st.write(f"📈 Total Scans: {len(df)}")
+
+    most_common = df["prediction"].value_counts().idxmax()
+    st.write(f"🧠 Most Common Prediction: {most_common}")
+
+    st.write("📊 Tumor Distribution")
+    st.bar_chart(df["prediction"].value_counts())
+
+    st.write("📉 Confidence Trend")
+    st.line_chart(df["confidence"])
+
+else:
+    st.info("No reports available yet.")
