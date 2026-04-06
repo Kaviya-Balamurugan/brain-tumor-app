@@ -18,6 +18,9 @@ if "logged_in" not in st.session_state:
 if "username" not in st.session_state:
     st.session_state.username = ""
 
+if "saved" not in st.session_state:
+    st.session_state.saved = False
+
 # ================= INIT =================
 create_table()
 create_user_table()
@@ -62,7 +65,7 @@ if not st.session_state.logged_in:
 
     st.stop()
 
-# ================= SIDEBAR AFTER LOGIN =================
+# ================= SIDEBAR =================
 st.sidebar.write(f"👤 {st.session_state.username}")
 
 if st.sidebar.button("Logout"):
@@ -152,6 +155,9 @@ patient_name = st.text_input("Enter Patient Name", st.session_state.username)
 uploaded_file = st.file_uploader("Upload MRI Image", type=["jpg","png","jpeg"])
 
 if uploaded_file:
+    # 🔥 reset save flag for new upload
+    st.session_state.saved = False
+
     image = Image.open(uploaded_file)
 
     quality_status = check_image_quality(image)
@@ -176,12 +182,15 @@ if uploaded_file:
             confidence = result["confidence"]
             level = result["confidence_level"]
 
-            insert_report(
-                patient_name,
-                label,
-                confidence,
-                datetime.now().strftime("%Y-%m-%d %H:%M")
-            )
+            # ✅ SAVE ONLY ONCE
+            if not st.session_state.saved:
+                insert_report(
+                    patient_name,
+                    label,
+                    confidence,
+                    datetime.now().strftime("%Y-%m-%d %H:%M")
+                )
+                st.session_state.saved = True
 
             st.success(f"Prediction: {label}")
             st.info(f"Confidence: {confidence*100:.2f}%")
