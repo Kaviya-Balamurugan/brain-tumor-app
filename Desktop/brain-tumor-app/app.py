@@ -81,10 +81,15 @@ def predict_from_api(image):
     files = {"file": ("image.jpg", buf.getvalue(), "image/jpeg")}
 
     try:
-        response = requests.post(API_URL, files=files)
+        response = requests.post(API_URL, files=files, timeout=60)
+
+        if response.status_code != 200:
+            return {"error": f"API error: {response.status_code}"}
+
         return response.json()
-    except:
-        return {"error": "API not running"}
+
+    except Exception as e:
+        return {"error": str(e)}
 
 # ================= UI =================
 st.title("🧠 Brain Tumor Detection System")
