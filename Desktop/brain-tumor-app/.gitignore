@@ -1,0 +1,26 @@
+# Ignore system files
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignore environment
+.env
+venv/
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore large files
+*.zip
+*.exe
+
+# Ignore user folders
+../
+../../
+AppData/
+Downloads/
+Documents/
+
+# Ignore model if needed
+model.onnx
