@@ -7,7 +7,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from datetime import datetime
 
 # 🔥 IMPORTANT: PUT YOUR REAL API LINK
-API_URL = "https://your-api.onrender.com/predict"
+API_URL = "https://brain-tumor-app-1-hmhx.onrender.com/predict"
 
 st.set_page_config(page_title="Brain Tumor Detection", layout="wide")
 
