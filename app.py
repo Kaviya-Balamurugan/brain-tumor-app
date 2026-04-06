@@ -18,8 +18,8 @@ if "logged_in" not in st.session_state:
 if "username" not in st.session_state:
     st.session_state.username = ""
 
-if "saved" not in st.session_state:
-    st.session_state.saved = False
+if "last_entry" not in st.session_state:
+    st.session_state.last_entry = None
 
 # ================= INIT =================
 create_table()
@@ -29,7 +29,7 @@ API_URL = "https://brain-tumor-app-1-hmhx.onrender.com/predict"
 
 st.set_page_config(page_title="Brain Tumor Detection", layout="wide")
 
-# ================= LOGIN SYSTEM =================
+# ================= LOGIN =================
 menu = st.sidebar.selectbox("Menu", ["Login", "Signup"])
 
 if not st.session_state.logged_in:
@@ -51,7 +51,7 @@ if not st.session_state.logged_in:
             else:
                 st.error("Invalid credentials")
 
-    elif menu == "Signup":
+    else:
         st.title("📝 Signup")
 
         new_user = st.text_input("Username")
@@ -125,8 +125,7 @@ def check_image_quality(image):
         return "⚠️ Image too dark"
     elif brightness > 220:
         return "⚠️ Image too bright"
-    else:
-        return "good"
+    return "good"
 
 # ================= API =================
 def predict_from_api(image):
@@ -155,15 +154,12 @@ patient_name = st.text_input("Enter Patient Name", st.session_state.username)
 uploaded_file = st.file_uploader("Upload MRI Image", type=["jpg","png","jpeg"])
 
 if uploaded_file:
-    # 🔥 reset save flag for new upload
-    st.session_state.saved = False
-
     image = Image.open(uploaded_file)
 
     quality_status = check_image_quality(image)
     if quality_status != "good":
         st.warning(quality_status)
-        st.info("Try uploading a clearer MRI image for better accuracy.")
+        st.info("Try uploading a clearer MRI image.")
 
     col1, col2 = st.columns(2)
 
@@ -182,15 +178,14 @@ if uploaded_file:
             confidence = result["confidence"]
             level = result["confidence_level"]
 
-            # ✅ SAVE ONLY ONCE
-            if not st.session_state.saved:
-                insert_report(
-                    patient_name,
-                    label,
-                    confidence,
-                    datetime.now().strftime("%Y-%m-%d %H:%M")
-                )
-                st.session_state.saved = True
+            current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+            # ✅ STRONG DUPLICATE PREVENTION
+            current_entry = (patient_name, label, round(confidence, 4), current_time)
+
+            if st.session_state.last_entry != current_entry:
+                insert_report(patient_name, label, confidence, current_time)
+                st.session_state.last_entry = current_entry
 
             st.success(f"Prediction: {label}")
             st.info(f"Confidence: {confidence*100:.2f}%")
@@ -208,15 +203,18 @@ st.subheader("📂 Previous Reports")
 
 reports = get_reports()
 
-for r in reports[:10]:
+# ✅ REMOVE DUPLICATES IN DISPLAY
+unique_reports = list(dict.fromkeys(reports))
+
+for r in unique_reports[:10]:
     st.write(f"👤 {r[1]} | 🧠 {r[2]} | 📊 {r[3]*100:.2f}% | 🕒 {r[4]}")
 
 # ================= ANALYTICS =================
 st.markdown("---")
 st.subheader("📊 Analytics Dashboard")
 
-if reports:
-    df = pd.DataFrame(reports, columns=["id", "name", "prediction", "confidence", "date"])
+if unique_reports:
+    df = pd.DataFrame(unique_reports, columns=["id", "name", "prediction", "confidence", "date"])
 
     st.write(f"📈 Total Scans: {len(df)}")
 
