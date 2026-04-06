@@ -9,13 +9,19 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 from datetime import datetime
 from database import create_table, insert_report, get_reports
-
+from database import create_user_table, add_user, verify_user
 # ================= INIT =================
 create_table()
+create_user_table()
 
 API_URL = "https://brain-tumor-app-1-hmhx.onrender.com/predict"
 
 st.set_page_config(page_title="Brain Tumor Detection", layout="wide")
+st.sidebar.write(f"👤 {st.session_state.username}")
+
+if st.sidebar.button("Logout"):
+    st.session_state.logged_in = False
+    st.rerun()
 
 # ================= PDF =================
 def generate_pdf(prediction, confidence, level, patient_name):
@@ -71,6 +77,46 @@ def check_image_quality(image):
         return "⚠️ Image too bright"
     else:
         return "good"
+    
+# ================= LOGIN SYSTEM =================
+
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
+menu = st.sidebar.selectbox("Menu", ["Login", "Signup"])
+
+if not st.session_state.logged_in:
+
+    if menu == "Login":
+        st.title("🔐 Login")
+
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+
+        if st.button("Login"):
+            user = verify_user(username, password)
+
+            if user:
+                st.session_state.logged_in = True
+                st.session_state.username = username
+                st.success("Login successful!")
+                st.rerun()
+            else:
+                st.error("Invalid credentials")
+
+    elif menu == "Signup":
+        st.title("📝 Signup")
+
+        new_user = st.text_input("Username")
+        new_pass = st.text_input("Password", type="password")
+
+        if st.button("Signup"):
+            if add_user(new_user, new_pass):
+                st.success("Account created! Please login.")
+            else:
+                st.error("Username already exists")
+
+    st.stop()
 
 # ================= API =================
 def predict_from_api(image):
