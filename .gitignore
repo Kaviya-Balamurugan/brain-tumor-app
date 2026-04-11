@@ -24,3 +24,5 @@ Documents/
 
 # Ignore model if needed
 model.onnx
+
+reports.db
